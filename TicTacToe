@@ -1,0 +1,682 @@
+#include <Keypad.h>
+int gamePlay[3][3] = { // Holds the current game
+  {0, 0, 0},
+  {0, 0, 0},
+  {0, 0, 0}
+};
+
+
+// Define pins
+const byte ROWS = 3; //Three rows
+
+const byte COLS = 3; //Three columns
+
+char keys[ROWS][COLS] = {
+
+  {'1','2','3'},
+
+  {'4','5','6' },
+
+  {'7','8','9'},
+
+  
+
+};
+const int buttons[3][3][2]= {{{5,9},{5,8},{5,7}},{{4,9},{4,8},{4,7}},{{3,9},{3,8},{3,7}}};
+
+
+byte rowPins[ROWS] = {5, 4, 3}; //connect to the row pinouts of the keypad
+
+byte colPins[COLS] = {9, 8, 7}; //connect to the column pinouts of the keypad
+
+Keypad keypad = Keypad( makeKeymap(keys), rowPins, colPins, ROWS, COLS );
+
+
+
+const int blue[3][3] = { // blue is the player
+  {30, 31, 32},
+  {33, 34, 35},
+  {36, 37, 38}
+};
+
+const int red[3][3] = { // Red is the Arduino
+  {40, 41, 42},
+  {43, 44, 45},
+  {46, 47, 48}
+};
+/*const int button[3][3] = { // Buttons to choose position
+  {2, 3, 4},
+  {5, 6, 7},
+  {8, 9, 10}
+};*/
+
+
+const int blueWin = 50; // Lights if the player wins
+const int redWin = 51; // Lights if the Arduino wins
+const int resetButton = 11; // Button to start a new game
+
+
+const int win[8][3][3] = { // This 4D array defines all possible winning combinations
+  {
+    {1, 1, 1},
+    {0, 0, 0},
+    {0, 0, 0}
+  },
+  {
+    {0, 0, 0},
+    {1, 1, 1},
+    {0, 0, 0}
+  },
+  {
+    {0, 0, 0},
+    {0, 0, 0},
+    {1, 1, 1}
+  },
+  {
+    {1, 0, 0},
+    {1, 0, 0},
+    {1, 0, 0}
+  },
+  {
+    {0, 1, 0},
+    {0, 1, 0},
+    {0, 1, 0}
+  },
+  {
+    {0, 0, 1},
+    {0, 0, 1},
+    {0, 0, 1}
+  },
+  {
+    {1, 0, 0},
+    {0, 1, 0},
+    {0, 0, 1}
+  },
+  {
+    {0, 0, 1},
+    {0, 1, 0},
+    {1, 0, 0}
+  }
+};
+
+
+
+
+// Global variables
+
+int squaresLeft = 9; // The number of free squares left on the board
+int played = 0; // Has the Arduino played or not
+
+
+// Global constants
+const int startupFlashSpeed = 100; // The time in milliseconds the LEDs light for on startup
+const int arduinoDelay = 3000; // How long the Arduino waits before playing (simulates thought)
+
+
+void setup() {
+  // put your setup code here, to run once:
+  // Start serial comms
+  Serial.begin(9600);
+
+
+
+  // Define blue and red pins as outputs
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      pinMode(blue[i][j], OUTPUT);
+      pinMode(red[i][j], OUTPUT);
+    }
+  }
+
+
+  // Define blue and red win lights as outputs
+  pinMode(blueWin, OUTPUT);
+  pinMode(redWin, OUTPUT);
+  // Define buttons as inputs
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      pinMode(keys[i][j], INPUT);
+    }
+  }
+
+
+  //Define reset button as input
+  pinMode(resetButton, INPUT);
+
+
+  initialise();
+
+
+  // Do startup flash
+  startupFlash();
+}
+
+
+void initialise() {
+  // Prepare the board for a game
+
+
+  // Set blue and red LEDs off
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      digitalWrite(blue[i][j], LOW);
+      digitalWrite(red[i][j], LOW);
+      gamePlay[i][j] = 0;
+    }
+  }
+
+
+  // Set win LEDs off
+  digitalWrite(blueWin, LOW);
+  digitalWrite(redWin, LOW);
+
+
+  // Reset variables
+  squaresLeft = 9;
+
+
+  // Tell the player it's their turn
+
+}
+
+
+
+void loop() {
+  // put your main code here, to run repeatedly:
+  // Wait for an input and call the buttonPress routine if pressed
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+       char o = keypad.getKey();
+       if(keys[i][j]== o )
+       {
+        geton(i,j);
+        break;
+       }
+      }
+    }
+  }
+
+
+void buttonPress(int i, int j) {
+  // Button pressed, light the blue LED and note the square as taken
+  Serial.print("Button press "); Serial.print(i); Serial.println(j);
+  digitalWrite(blue[i][j], HIGH);
+  gamePlay[i][j] = 1; // Note the square played
+  squaresLeft -= 1; // Update number of squares left
+  printGame(); // Print the game to serial monitor
+  checkGame(); // Check for a winner
+  arduinosTurn(); // Arduino's turn
+}
+
+bool geton(int i,int j)
+{
+ 
+  if(i==0 == HIGH && j==0)
+  {
+    if(digitalRead(buttons[i][j][0]) == HIGH &&
+    digitalRead(buttons[i][j][1])  == HIGH && gamePlay[i][j]==0)
+    {
+      buttonPress(i, j);
+       
+      }
+    }
+  else if(i==0 == HIGH && j==1)
+  {
+    
+    if(digitalRead(buttons[i][j][0]) == HIGH &&
+    digitalRead(buttons[i][j][1]) == HIGH && gamePlay[i][j]==0)
+    {
+      buttonPress(i, j);
+       
+      }
+    }
+  else if(i==0 == HIGH && j==2)
+  {
+    if(digitalRead(buttons[i][j][0]) == HIGH &&
+    digitalRead(buttons[i][j][1]) == HIGH && gamePlay[i][j]==0)
+    {
+      buttonPress(i, j);
+       
+      }
+    }
+  else if(i==1 == HIGH && j==0)
+  {
+    if(digitalRead(buttons[i][j][0]) == HIGH &&
+    digitalRead(buttons[i][j][1]) == HIGH && gamePlay[i][j]==0)
+    {
+      buttonPress(i, j);
+      
+      }
+    }
+  else if(i==1 == HIGH && j==1)
+  {
+    if(digitalRead(buttons[i][j][0]) == HIGH &&
+    digitalRead(buttons[i][j][1]) == HIGH && gamePlay[i][j]==0)
+    {
+      buttonPress(i, j);
+       
+      }
+    }
+  else if(i==1 == HIGH && j==2)
+  {
+    if(digitalRead(buttons[i][j][0]) == HIGH &&
+    digitalRead(buttons[i][j][1]) == HIGH && gamePlay[i][j]==0)
+    {
+      buttonPress(i, j);
+       
+      }
+    }
+  else if(i==2 == HIGH && j==0)
+  {
+    if(digitalRead(buttons[i][j][0]) == HIGH &&
+    digitalRead(buttons[i][j][1]) == HIGH && gamePlay[i][j]==0)
+    {
+      buttonPress(i, j);
+       
+      }
+    }
+  else if(i==2 == HIGH && j==1)
+  {
+    if(digitalRead(buttons[i][j][0]) == HIGH &&
+    digitalRead(buttons[i][j][1]) == HIGH && gamePlay[i][j]==0)
+    {
+      buttonPress(i, j);
+       
+      }
+    }
+  else if(i==2 == HIGH && j==2)
+  {
+    if(digitalRead(buttons[i][j][0])  == HIGH &&  digitalRead(buttons[i][j][1]) == HIGH && gamePlay[i][j]==0)
+    {
+      buttonPress(i, j);
+      
+      }
+    }
+  
+  
+  }
+void arduinosTurn() {
+  // Arduino takes a turn
+  Serial.println("Arduino's turn");
+
+  checkPossiblities(); // Check to see if a winning move can be played
+  if (played == 0) {
+    checkBlockers(); // If no winning move played, check to see if we can block a win
+  }
+  if (played == 0) {
+    randomPlay(); // Otherwise, pick a random square
+  }
+  squaresLeft -= 1; // Update number of squares left
+  played = 0; // Reset if played or not
+  printGame(); // Print the games to serial monitor
+  checkGame(); // Check for a winner
+
+}
+
+
+void checkPossiblities() {
+  // Check all rows, then columns, then diagonals to see if there are two reds lit and a free square to make a line of three
+
+  int poss = 0; // Used to count if possible - if it gets to 2 then its a possiblity
+  int x = 0; // The X position to play
+  int y = 0; // The Y position to play
+  int space = 0; // Is there a free square or not to play
+  // Check rows
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      if (gamePlay[i][j] == 2) {
+        poss += 1; // Square is red. Increment the possiblity counter
+      }
+      if (gamePlay[i][j] == 0) {
+        space = 1; // Square is empty. Note this and the position
+        x = i;
+        y = j;
+      }
+      if ((poss == 2) && (space == 1)) { // 2 red squares and a free square
+        Serial.print("Found an obvious row! "); Serial.print(x); Serial.println(y);
+        playPoss(x, y);
+      }
+    }
+    poss = 0;
+    x = 0;
+    y = 0;
+    space = 0;
+  }
+
+
+  // Check columns - same as for rows but the "for" loops have been reversed to go to columns
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      if (gamePlay[j][i] == 2) {
+        poss += 1;
+      }
+      if (gamePlay[j][i] == 0) {
+        space = 1;
+        x = j;
+        y = i;
+      }
+      if ((poss == 2) && (space == 1) && (played == 0)) { // This time also check if we've already played
+        Serial.print("Found an obvious column! "); Serial.print(x); Serial.println(y);
+        playPoss(x, y);
+      }
+    }
+    // Reset variables
+    poss = 0;
+    x = 0;
+    y = 0;
+    space = 0;
+  }
+
+
+  // Check crosses - as for rows and columns but "for" loops changed
+  // Check diagonal top left to bottom right
+  for (int i = 0; i < 3; i++) {
+    if (gamePlay[i][i] == 2) {
+      poss += 1;
+    }
+    if (gamePlay[i][i] == 0) {
+      space = 1;
+      x = i;
+      y = i;
+    }
+    if ((poss == 2) && (space == 1) && (played == 0)) {
+      Serial.print("Found an obvious cross! "); Serial.print(x); Serial.println(y);
+      playPoss(x, y);
+    }
+  }
+  // Reset variables
+  poss = 0;
+  x = 0;
+  y = 0;
+  space = 0;
+
+
+  // Check diagonal top right to bottom left
+  int row = 0; // Used to count up the rows
+  for (int i = 2; i >= 0; i--) { // We count DOWN the columns
+    if (gamePlay[row][i] == 2) {
+      poss += 1;
+    }
+    if (gamePlay[row][i] == 0) {
+      space = 1;
+      x = row;
+      y = i;
+    }
+    if ((poss == 2) && (space == 1) && (played == 0)) {
+      Serial.print("Found an obvious cross! "); Serial.print(x); Serial.println(y);
+      playPoss(x, y);
+    }
+    row += 1; // Increment the row counter
+  }
+  // Reset variables
+  poss = 0;
+  x = 0;
+  y = 0;
+  space = 0;
+}
+
+
+void checkBlockers() {
+  // As for checkPossibilites() but this time checking the players squares for places to block a line of three
+  Serial.println("Checking possibilities to block...");
+
+  int poss = 0;
+  int x = 0;
+  int y = 0;
+  int space = 0;
+
+
+  // Check rows
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      if (gamePlay[i][j] == 1) {
+        poss += 1;
+      }
+      if (gamePlay[i][j] == 0) {
+        space = 1;
+        x = i;
+        y = j;
+      }
+      if ((poss == 2) && (space == 1) && (played == 0)) {
+        Serial.print("Found an blocker row! "); Serial.print(x); Serial.println(y);
+        playPoss(x, y);
+      }
+    }
+    poss = 0;
+    x = 0;
+    y = 0;
+    space = 0;
+  }
+
+
+  // Check columns
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      if (gamePlay[j][i] == 1) {
+        poss += 1;
+      }
+      if (gamePlay[j][i] == 0) {
+        space = 1;
+        x = j;
+        y = i;
+      }
+      if ((poss == 2) && (space == 1) && (played == 0)) {
+        Serial.print("Found an blocker column! "); Serial.print(x); Serial.println(y);
+        playPoss(x, y);
+      }
+    }
+    poss = 0;
+    x = 0;
+    y = 0;
+    space = 0;
+  }
+
+
+  // Check crosses
+  for (int i = 0; i < 3; i++) {
+    if (gamePlay[i][i] == 1) {
+      poss += 1;
+    }
+    if (gamePlay[i][i] == 0) {
+      space = 1;
+      x = i;
+      y = i;
+    }
+    if ((poss == 2) && (space == 1) && (played == 0)) {
+      Serial.print("Found an blocker cross! "); Serial.print(x); Serial.println(y);
+      playPoss(x, y);
+    }
+  }
+  poss = 0;
+  x = 0;
+  y = 0;
+  space = 0;
+  int row = 0;
+  for (int i = 2; i >= 0; i--) {
+    if (gamePlay[row][i] == 1) {
+      poss += 1;
+    }
+    if (gamePlay[row][i] == 0) {
+      space = 1;
+      x = row;
+      y = i;
+    }
+    if ((poss == 2) && (space == 1) && (played == 0)) {
+      Serial.print("Found an blocker cross! "); Serial.print(x); Serial.println(y);
+      playPoss(x, y);
+    }
+    row += 1;
+  }
+  poss = 0;
+  x = 0;
+  y = 0;
+  space = 0;
+}
+
+
+void randomPlay() {
+  // No win or block to play... Let's just pick a square at random
+  Serial.println("Choosing randomly...");
+  int choice = random(1, squaresLeft); // We pick a number from 0 to the number of squares left on the board
+  Serial.print("Arduino chooses "); Serial.println(choice);
+  int pos = 1; // Stores the free square we're currently on
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      if (gamePlay[i][j] == 0) { // Check to see if square empty
+        if (pos == choice) { // Play the empty square that corresponds to the random number
+          playPoss(i, j);
+        }
+        pos += 1; // Increment the free square counter
+      }
+    }
+  }
+}
+
+
+void playPoss(int x, int y) {
+  // Simulate thought and then play the chosen square
+
+  delay(arduinoDelay);
+
+  digitalWrite(red[x][y], HIGH);
+  gamePlay[x][y] = 2; // Update the game play array
+  played = 1; // Note that we've played
+}
+
+
+void checkGame() {
+  // Check the game for a winner
+
+
+  // Check if the player has won
+  Serial.println("Checking for a winner");
+
+  int player = 1;
+  int winner = 0;
+  for (int i = 0; i < 8; i++) { // We cycle through all winning combinations in the 4D array and check if they correspond to the current game
+    //Check game
+    int winCheck = 0;
+    for (int j = 0; j < 3; j++) {
+      for (int k = 0; k < 3; k++) {
+        if ((win[i][j][k] == 1) && (gamePlay[j][k] == player)) {
+          winCheck += 1;
+        }
+      }
+    }
+    if (winCheck == 3) {
+      winner = 1;
+      Serial.print("Player won game "); Serial.println(i);
+      endGame(1);
+    }
+  }
+
+
+  // Do the same for to check if the Arduino has won
+  player = 2;
+  winner = 0;
+  for (int i = 0; i < 8; i++) {
+    //Check game
+    int winCheck = 0;
+    for (int j = 0; j < 3; j++) {
+      for (int k = 0; k < 3; k++) {
+        if ((win[i][j][k] == 1) && (gamePlay[j][k] == player)) {
+          winCheck += 1;
+        }
+      }
+    }
+    if (winCheck == 3) {
+      winner = 1;
+      Serial.print("Arduino won game "); Serial.println(i);
+      endGame(2);
+    }
+  }
+  if (squaresLeft == -1) {
+    endGame(0);
+  }
+}
+
+
+void printGame() {
+  // Prints the game to the serial monitor
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      Serial.print(gamePlay[i][j]); Serial.print(" ");
+    }
+    Serial.println("");
+  }
+  Serial.print(squaresLeft); Serial.println(" squares left");
+}
+
+
+void endGame(int winner) {
+  // Is called when a winner is found
+  switch (winner) {
+    case 0:
+      Serial.println("It's a draw");
+      digitalWrite(blueWin, HIGH);
+      digitalWrite(redWin, HIGH);
+
+      break;
+    case 1:
+      Serial.println("Player wins");
+      digitalWrite(blueWin, HIGH);
+
+      break;
+    case 2:
+      Serial.println("Arduino wins");
+      digitalWrite(redWin, HIGH);
+
+      break;
+  }
+
+  while (digitalRead(resetButton) == LOW) {
+  }
+  initialise();
+}
+
+
+
+
+void startupFlash() {
+  // Flash at the start
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      digitalWrite(blue[i][j], HIGH);
+      digitalWrite(blueWin, HIGH);
+      delay(startupFlashSpeed);
+      digitalWrite(blue[i][j], LOW);
+      digitalWrite(blueWin, LOW);
+      digitalWrite(red[i][j], HIGH);
+      digitalWrite(redWin, HIGH);
+      delay(startupFlashSpeed);
+      digitalWrite(red[i][j], LOW);
+      digitalWrite(redWin, LOW);
+    }
+  }
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      digitalWrite(blue[j][i], HIGH);
+      delay(startupFlashSpeed);
+      digitalWrite(blue[j][i], LOW);
+    }
+  }
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      digitalWrite(red[i][j], HIGH);
+      delay(startupFlashSpeed);
+      digitalWrite(red[i][j], LOW);
+    }
+  }
+  for (int i = 0; i < 3; i++) {
+    digitalWrite(red[i][i], HIGH);
+    delay(startupFlashSpeed);
+    digitalWrite(red[i][i], LOW);
+  }
+  int row = 0;
+  for (int i = 2; i >= 0; i--) {
+    digitalWrite(blue[row][i], HIGH);
+    delay(startupFlashSpeed);
+    digitalWrite(blue[row][i], LOW);
+    row += 1;
+  }
+}
